@@ -239,6 +239,18 @@ in
       '';
     };
 
+    darwinLaunchdAgent = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Whether to install a launchd agent to decrypt secrets on macOS login.
+        Set to false for headless or service accounts that don't have a GUI
+        session, where the gui/$UID launchd domain doesn't exist.
+        Secrets are still decrypted during home-manager activation regardless
+        of this setting.
+      '';
+    };
+
     age = {
       keyFile = lib.mkOption {
         type = lib.types.nullOr pathNotInStore;
@@ -388,7 +400,7 @@ in
     };
 
     # Darwin: load secrets once on login
-    launchd.agents.sops-nix = {
+    launchd.agents.sops-nix = lib.mkIf cfg.darwinLaunchdAgent {
       enable = true;
       config = {
         Program = script;
@@ -404,13 +416,18 @@ in
     home.activation =
       let
         darwin =
-          let
-            domain-target = "gui/$(id -u ${config.home.username})";
-          in
-          ''
-            /bin/launchctl bootout ${domain-target}/org.nix-community.home.sops-nix && true
-            /bin/launchctl bootstrap ${domain-target} ${config.home.homeDirectory}/Library/LaunchAgents/org.nix-community.home.sops-nix.plist
-          '';
+          if cfg.darwinLaunchdAgent then
+            let
+              domain-target = "gui/$(id -u ${config.home.username})";
+            in
+            ''
+              /bin/launchctl bootout ${domain-target}/org.nix-community.home.sops-nix && true
+              /bin/launchctl bootstrap ${domain-target} ${config.home.homeDirectory}/Library/LaunchAgents/org.nix-community.home.sops-nix.plist
+            ''
+          else
+            ''
+              ${script}
+            '';
 
         linux =
           let
