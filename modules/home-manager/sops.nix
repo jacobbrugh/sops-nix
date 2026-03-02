@@ -430,7 +430,13 @@ in
               /bin/launchctl bootstrap ${domain-target} ${config.home.homeDirectory}/Library/LaunchAgents/org.nix-community.home.sops-nix.plist
             ''
           else
+            let
+              envVars = lib.concatStringsSep "\n" (
+                lib.mapAttrsToList (name: value: "export ${name}=${lib.escapeShellArg (toString value)}") cfg.environment
+              );
+            in
             ''
+              ${envVars}
               ${script}
             '';
 
